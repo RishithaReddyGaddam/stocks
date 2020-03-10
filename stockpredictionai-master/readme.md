@@ -564,8 +564,6 @@ plt.show()
 
 
 
-<center><img src="imgs/VAE.jpg" width=428></img></center>
-
 
 ```python
 batch_size = 64
