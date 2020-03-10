@@ -1,100 +1,3 @@
-
-# Using the latest advancements in AI to predict stock market movements
-
- 
-
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;In this notebook I will create a complete process for predicting stock price movements. Follow along and we will achieve some pretty good results. For that purpose we will use a **Generative Adversarial Network** (GAN) with **LSTM**, a type of Recurrent Neural Network, as generator, and a Convolutional Neural Network, **CNN**, as a discriminator. We use LSTM for the obvious reason that we are trying to predict time series data. Why we use GAN and specifically CNN as a discriminator? That is a good question: there are special sections on that later.
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;We will go into greater details for each step, of course, but the most difficult part is the GAN: very tricky part of successfully training a GAN is getting the right set of hyperparameters. For that reason we will use **Bayesian optimisation** (along with Gaussian processes) and **Reinforcement learning** (RL) for deciding when and how to change the GAN's hyperparameters (the exploration vs. exploitation dilemma). In creating the reinforcement learning we will use the most recent advancements in the field, such as **Rainbow** and **PPO**.
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;We will use a lot of different types of input data. Along with the stock's historical trading data and technical indicators, we will use the newest advancements in **NLP** (using 'Bidirectional Embedding Representations from Transformers', **BERT**, sort of a transfer learning for NLP) to create sentiment analysis (as a source for fundamental analysis), **Fourier transforms** for extracting overall trend directions, **Stacked autoencoders** for identifying other high-level features, **Eigen portfolios** for finding correlated assets, autoregressive integrated moving average (**ARIMA**) for the stock function approximation, and many more, in order to capture as much information, patterns, dependencies, etc, as possible about the stock. As we all know, the more (data) the merrier. Predicting stock price movements is an extremely complex task, so the more we know about the stock (from different perspectives) the higher our changes are.
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;For the purpose of creating all neural nets we will use MXNet and its high-level API - Gluon, and train them on multiple GPUs.
-
-**Note:** _Although I try to get into details of the math and the mechanisms behind almost all algorithms and techniques, this notebook is not explicitly intended to explain how machine/deep learning, or the stock markets, work. The purpose is rather to show how we can use different techniques and algorithms for the purpose of accurately predicting stock price movements, and to also give rationale behind the reason and usefulness of using each technique at each step._
-
-_Notebook created: January 9, 2019_.
-
-
-**Figure 1 - The overall architecture of our work**
-
-<center><img src='imgs/main.jpg' width=1060></img></center>
-
-## Table of content
-* [Introduction](#overview)
-* [Acknowledgement](#acknowledgement)
-* [The data](#thedata)
-    * [Correlated assets](#corrassets)
-    * [Technical indicators](#technicalind)
-    * [Fundamental analysis](#fundamental)
-        - [Bidirectional Embedding Representations from Transformers - BERT](#bidirnlp)
-    * [Fourier transforms for trend analysis](#fouriertransform)
-    * [ARIMA as a feature](#arimafeature)
-    * [Statistical checks](#statchecks)
-        - [Heteroskedasticity, multicollinearity, serial correlation](#hetemultiser)
-    * [Feature Engineering](#featureeng)
-        * [Feature importance with XGBoost](#xgboost)
-    * [Extracting high-level features with Stacked Autoencoders](#stacked_ae)
-        * [Activation function - GELU (Gaussian Error)](#gelu)
-        * [Eigen portfolio with PCA](#pca)
-    * [Deep Unsupervised Learning for anomaly detection in derivatives pricing](#dulfaddp)
-* [Generative Adversarial Network - GAN](#qgan)
-    * [Why GAN for stock market prediction?](#whygan)
-    * [Metropolis-Hastings GAN and Wasserstein GAN](#mhganwgan)
-    * [The Generator - One layer RNN](#thegenerator)
-        - [LSTM or GRU](#lstmorgru)
-        - [The LSTM architecture](#lstmarchitecture)
-        - [Learning rate scheduler](#lrscheduler)
-        - [How to prevent overfitting and the bias-variance trade-off](#preventoverfitting)
-        - [Custom weights initializers and custom loss metric](#customfns)
-    * [The Discriminator - 1D CNN](#thediscriminator)
-        - [Why CNN as a discriminator?](#why_cnn_architecture)
-        - [The CNN architecture](#the_cnn_architecture)
-    * [Hyperparameters](#hyperparams)
-* [Hyperparameters optimization](#hyperparams_optim)
-    * [Reinforcement learning for hyperparameters optimization](#reinforcementlearning)
-        - [Theory](#reinforcementlearning_theory)
-            - [Rainbow](#rl_rainbow)
-            - [PPO](#rl_ppo)
-        - [Further work on Reinforcement learning](#reinforcementlearning_further)
-    * [Bayesian optimization](#bayesian_opt)
-        - [Gaussian process](#gaussprocess)
-* [The result](#theresult)
-* [What is next?](#whatisnext)
-* [Disclaimer](#disclaimer)
-
-# 1. Introduction <a class="anchor" id="overview"></a>
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Accurately predicting the stock markets is a complex task as there are millions of events and pre-conditions for a particilar stock to move in a particular direction. So we need to be able to capture as many of these pre-conditions as possible. We also need make several important assumptions: 1) markets are not 100% random, 2) history repeats, 3) markets follow people's rational behavior, and 4) the markets are '_perfect_'. And, please, do read the **Disclaimer** at the <a href="#disclaimer">bottom</a>.
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;We will try to predict the price movements of **Goldman Sachs** (NYSE: GS). For the purpose, we will use daily closing price from January 1st, 2010 to December 31st, 2018 (seven years for training purposes and two years for validation purposes). _We will use the terms 'Goldman Sachs' and 'GS' interchangeably_.
-
-# 2. Acknowledgement <a class="anchor" id="acknowledgement"></a>
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Before we continue, I'd like to thank my friends <a href="https://github.com/manganganath">Nuwan</a> and <a href="https://github.com/Q4living">Thomas</a> without whose ideas and support I wouldn't have been able to create this work.
-
-# 3. The Data <a class="anchor" id="thedata"></a>
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;We need to understand what affects whether GS's stock price will move up or down. It is what people as a whole think. Hence, we need to incorporate as much information (depicting the stock from different aspects and angles) as possible. (We will use daily data - 1,585 days to train the various algorithms (70% of the data we have) and predict the next 680 days (test data). Then we will compare the predicted results with a test (hold-out) data. Each type of data (we will refer to it as _feature_) is explained in greater detail in later sections, but, as a high level overview, the features we will use are:
-
-1. **Correlated assets** - these are other assets (any type, not necessarily stocks, such as commodities, FX, indices, or even fixed income securities). A big company, such as Goldman Sachs, obviously doesn't 'live' in an isolated world - it depends on, and interacts with, many external factors, including its competitors, clients, the global economy, the geo-political situation, fiscal and monetary policies, access to capital, etc. The details are listed later.
-2. **Technical indicators** - a lot of investors follow technical indicators. We will include the most popular indicators as independent features. Among them - 7 and 21 days moving average, exponential moving average, momentum, Bollinger bands, MACD.
-3. **Fundamental analysis** - A very important feature indicating whether a stock might move up or down. There are two features that can be used in fundamental analysis: 1) Analysing the company performance using 10-K and 10-Q reports, analysing ROE and P/E, etc (we will not use this), and 2) **News** - potentially news can indicate upcoming events that can potentially move the stock in certain direction. We will read all daily news for Goldman Sachs and extract whether the total sentiment about Goldman Sachs on that day is positive, neutral, or negative (as a score from 0 to 1). As many investors closely read the news and make investment decisions based (partially of course) on news, there is a somewhat high chance that if, say, the news for Goldman Sachs today are extremely positive the stock will surge tomorrow. _One crucial point, we will perform feature importance (meaning how indicative it is for the movement of GS) on absolutely every feature (including this one) later on and decide whether we will use it. More on that later_.<br/>
-    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;For the purpose of creating accurate sentiment prediction we will use Neural Language Processing (**NLP**). We will use **BERT** - Google's recently announced NLP approach for transfer learning for sentiment classification stock news sentiment extraction.
-4. **Fourier transforms** - Along with the daily closing price, we will create Fourier transforms in order to generalize several long- and short-term trends. Using these transforms we will eliminate a lot of noise (random walks) and create approximations of the real stock movement. Having trend approximations can help the LSTM network pick its prediction trends more accurately.
-5. **Autoregressive Integrated Moving Average** (ARIMA) - This was one of the most popular techniques for predicting future values of time series data (in the pre-neural networks ages). Let's add it and see if it comes off as an important predictive feature.
-6. **Stacked autoencoders** - most of the aforementioned features (fundamental analysis, technical analysis, etc) were found by people after decades of research. But maybe we have missed something. Maybe there are hidden correlations that people cannot comprehend due to the enormous amount of data points, events, assets, charts, etc. With stacked autoencoders (type of neural networks) we can use the power of computers and probably find new types of features that affect stock movements. Even though we will not be able to understand these features in human language, we will use them in the GAN.
-7. **Deep Unsupervised learning for anomaly detection in options pricing**. We will use one more feature - for every day we will add the price for 90-days call option on Goldman Sachs stock. Options pricing itself combines a lot of data. The price for options contract depends on the future value of the stock (analysts try to also predict the price in order to come up with the most accurate price for the call option). Using deep unsupervised learning (**Self-organized Maps**) we will try to spot anomalies in every day's pricing. Anomaly (such as a drastic change in pricing) might indicate an event that might be useful for the LSTM to learn the overall stock pattern.
-
-Next, having so many features, we need to perform a couple of important steps:
-1. Perform statistical checks for the 'quality' of the data. If the data we create is flawed, then no matter how sophisticated our algorithms are, the results will not be positive. The checks include making sure the data does not suffer from heteroskedasticity, multicollinearity, or serial correlation.
-2. Create feature importance. If a feature (e.g. another stock or a technical indicator) has no explanatory power to the stock we want to predict, then there is no need for us to use it in the training of the neural nets. We will using **XGBoost** (eXtreme Gradient Boosting), a type of boosted tree regression algorithms.
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;As a final step of our data preparation, we will also create **Eigen portfolios** using Principal Component Analysis (**PCA**) in order to reduce the dimensionality of the features created from the autoencoders.
-
-
-```python
 from utils import *
 
 import time
@@ -118,97 +21,27 @@ from sklearn.preprocessing import StandardScaler
 
 import xgboost as xgb
 from sklearn.metrics import accuracy_score
-```
 
-
-```python
 import warnings
 warnings.filterwarnings("ignore")
-```
 
-
-```python
 context = mx.cpu(); model_ctx=mx.cpu()
 mx.random.seed(1719)
-```
 
-**Note**: The purpose of this section (3. The Data) is to show the data preprocessing and to give rationale for using different sources of data, hence I will only use a subset of the full data (that is used for training).
-
-
-```python
 def parser(x):
     return datetime.datetime.strptime(x,'%Y-%m-%d')
-```
 
-
-```python
 dataset_ex_df = pd.read_csv('data/panel_data_close.csv', header=0, parse_dates=[0], date_parser=parser)
-```
 
-
-```python
 dataset_ex_df[['Date', 'GS']].head(3)
-```
 
-
-
-
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>Date</th>
-      <th>GS</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <th>0</th>
-      <td>2009-12-31</td>
-      <td>168.839996</td>
-    </tr>
-    <tr>
-      <th>1</th>
-      <td>2010-01-04</td>
-      <td>173.080002</td>
-    </tr>
-    <tr>
-      <th>2</th>
-      <td>2010-01-05</td>
-      <td>176.139999</td>
-    </tr>
-  </tbody>
-</table>
-</div>
-
-
-
-
-```python
 print('There are {} number of days in the dataset.'.format(dataset_ex_df.shape[0]))
-```
+
 
     There are 2265 number of days in the dataset.
 
 
-Let's visualize the stock for the last nine years. The dashed vertical line represents the separation between training and test data.
 
-
-```python
 plt.figure(figsize=(14, 5), dpi=100)
 plt.plot(dataset_ex_df['Date'], dataset_ex_df['GS'], label='Goldman Sachs stock')
 plt.vlines(datetime.date(2016,4, 20), 0, 270, linestyles='--', colors='gray', label='Train/Test data cut-off')
@@ -217,7 +50,6 @@ plt.ylabel('USD')
 plt.title('Figure 2: Goldman Sachs stock price')
 plt.legend()
 plt.show()
-```
 
 
 ![png](output_21_0.png)
