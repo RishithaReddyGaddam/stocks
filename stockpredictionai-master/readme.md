@@ -38,7 +38,7 @@ dataset_ex_df = pd.read_csv('data/panel_data_close.csv', header=0, parse_dates=[
 dataset_ex_df[['Date', 'GS']].head(3)
 
 print('There are {} number of days in the dataset.'.format(dataset_ex_df.shape[0]))
-
+```
 
     There are 2265 number of days in the dataset.
 
@@ -65,24 +65,6 @@ print('Number of training days: {}. Number of test days: {}.'.format(num_trainin
 ```
 
     Number of training days: 1585. Number of test days: 680.
-
-
-## 3.1. Correlated assets <a class="anchor" id="corrassets"></a>
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;As explained earlier we will use other assets as features, not only GS.
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;So what other assets would affect GS's stock movements? Good understanding of the company, its lines of businesses, competitive landscape, dependencies, suppliers and client type, etc is very important for picking the right set of correlated assets:
-- First are the **companies** similar to GS. We will add JPMorgan Chase and Morgan Stanley, among others, to the dataset.
-- As an investment bank, Goldman Sachs depends on the **global economy**. Bad or volatile economy means no M&As or IPOs, and possibly limited proprietary trading earnings. That is why we will include global economy indices. Also, we will include LIBOR (USD and GBP denominated) rate, as possibly shocks in the economy might be accounted for by analysts to set these rates, and other **FI** securities.
-- Daily volatility index (**VIX**) - for the reason described in the previous point.
-- **Composite indices** - such as NASDAQ and NYSE (from USA), FTSE100 (UK), Nikkei225 (Japan), Hang Seng and BSE Sensex (APAC) indices.
-- **Currencies** - global trade is many times reflected into how currencies move, ergo we'll use a basket of currencies (such as USDJPY, GBPUSD, etc) as features.
-
-#### Overall, we have 72 other assets in the dataset - daily price for every asset.
-
-## 3.2. Technical indicators <a class="anchor" id="technicalind"></a>
-
-We already covered what are technical indicators and why we use them so let's jump straight to the code. We will create technical indicators only for GS.
 
 
 ```python
@@ -243,11 +225,6 @@ dataset_TI_df.head()
 
 
 
-So we have the technical indicators (including MACD, Bollinger bands, etc) for every trading day. We have in total 12 technical indicators.
-
-Let's visualize the last 400 days of these indicators.
-
-
 ```python
 def plot_technical_indicators(dataset, last_days):
     plt.figure(figsize=(16, 10), dpi=100)
@@ -291,15 +268,6 @@ plot_technical_indicators(dataset_TI_df, 400)
 ![png](output_32_0.png)
 
 
-## 3.3. Fundamental analysis <a class="anchor" id="fundamental"></a>
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;For fundamental analysis we will perform sentiment analysis on all daily news about GS. Using sigmoid at the end, result will be between 0 and 1. The closer the score is to 0 - the more negative the news is (closer to 1 indicates positive sentiment). For each day, we will create the average daily score (as a number between 0 and 1) and add it as a feature.
-
-### 3.3.1. Bidirectional Embedding Representations from Transformers - BERT <a class="anchor" id="bidirnlp"></a>
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;For the purpose of classifying news as positive or negative (or neutral) we will use <a href="https://arxiv.org/abs/1810.04805">BERT</a>, which is a pre-trained language representation.
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Pretrained BERT models are already available in MXNet/Gluon. We just need to instantiated them and add two (arbitrary number) ```Dense``` layers, going to softmax - the score is from 0 to 1.
 
 
 ```python
@@ -307,15 +275,6 @@ plot_technical_indicators(dataset_TI_df, 400)
 import bert
 ```
 
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Going into the details of BERT and the NLP part is not in the scope of this notebook, but you have interest, do let me know - I will create a new repo only for BERT as it definitely is quite promissing when it comes to language processing tasks.
-
-## 3.4. Fourier transforms for trend analysis <a class="anchor" id="fouriertransform"></a>
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**Fourier transforms** take a function and create a series of sine waves (with different amplitudes and frames). When combined, these sine waves approximate the original function. Mathematically speaking, the transforms look like this:
-
-$$G(f) = \int_{-\infty}^\infty g(t) e^{-i 2 \pi f t} dt$$
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;We will use Fourier transforms to extract global and local trends in the GS stock, and to also denoise it a little. So let's see how it works.
 
 
 ```python
@@ -349,10 +308,6 @@ plt.show()
 ![png](output_45_0.png)
 
 
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;As you see in Figure 3 the more components from the Fourier transform we use the closer the approximation function is to the real stock price (the 100 components transform is almost identical to the original function - the red and the purple lines almost overlap). We use Fourier transforms for the purpose of extracting long- and short-term trends so we will use the transforms with 3, 6, and 9 components. You can infer that the transform with 3 components serves as the long term trend.
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Another technique used to denoise data is call **wavelets**. Wavelets and Fourier transform gave similar results so we will only use Fourier transforms.
-
 
 
 ```python
@@ -369,9 +324,6 @@ plt.show()
 ![png](output_47_0.png)
 
 
-## 3.5. ARIMA as a feature <a class="anchor" id="arimafeature"></a>
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**ARIMA** is a technique for predicting time series data. We will show how to use it, and althouth ARIMA will not serve as our final prediction, we will use it as a technique to denoise the stock a little and to (possibly) extract some new patters or features.
 
 
 ```python
@@ -480,21 +432,7 @@ plt.show()
 ![png](output_54_0.png)
 
 
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;As we can see from Figure 5 ARIMA gives a very good approximation of the real stock price. We will use the predicted price through ARIMA as an input feature into the LSTM because, as we mentioned before, we want to capture as many features and patterns about Goldman Sachs as possible. We go test MSE (mean squared error) of 10.151, which by itself is not a bad result (considering we do have a lot of test data), but still we will only use it as a feature in the LSTM.
 
-## 3.6. Statistical checks <a class="anchor" id="statchecks"></a>
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Ensuring that the data has good quality is very important for out models. In order to make sure our data is suitable we will perform a couple of simple checks in order to ensure that the results we achieve and observe are indeed real, rather than compromised due to the fact that the underlying data distribution suffers from fundamental errors.
-
-### 3.6.1. Heteroskedasticity, multicollinearity, serial correlation <a class="anchor" id="hetemultiser"></a>
-
-- **Conditional Heteroskedasticity** occurs when the error terms (the difference between a predicted value by a regression and the real value) are dependent on the data - for example, the error terms grow when the data point (along the x-axis) grow.
-- **Multicollinearity** is when error terms (also called residuals) depend on each other.
-- **Serial correlation** is when one data (feature) is a formula (or completely depemnds) of another feature.
-
-We will not go into the code here as it is straightforward and our focus is more on the deep learning parts, **but the data is qualitative**.
-
-## 3.7. Feature Engineering <a class="anchor" id="featureeng"></a>
 
 
 ```python
@@ -505,15 +443,6 @@ print('Total dataset has {} samples, and {} features.'.format(dataset_total_df.s
     Total dataset has 2265 samples, and 112 features.
 
 
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;So, after adding all types of data (the correlated assets, technical indicators, fundamental analysis, Fourier, and Arima) we have a total of 112 features for the 2,265 days (as mentioned before, however, only 1,585 days are for training data).
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;We will also have some more features generated from the autoencoders.
-
-### 3.7.1. Feature importance with XGBoost <a class="anchor" id="xgboost"></a>
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Having so many features we have to consider whether all of them are really indicative of the direction GS stock will take. For example, we included USD denominated LIBOR rates in the dataset because we think that changes in LIBOR might indicate changes in the economy, that, in turn, might indicate changes in the GS's stock behavior. But we need to test. There are many ways to test feature importance, but the one we will apply uses XGBoost, because it gives one of the best results in both classification and regression problems.
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Since the features dataset is quite large, for the purpose of presentation here we'll use only the technical indicators. During the real features importance testing all selected features proved somewhat important so we won't exclude anything when training the GAN.
 
 
 ```python
@@ -561,7 +490,6 @@ eval_result = regressor.evals_result()
 training_rounds = range(len(eval_result['validation_0']['rmse']))
 ```
 
-Let's plot the training and validation errors in order to observe the training and check for overfitting (there isn't overfitting).
 
 
 ```python
@@ -591,21 +519,7 @@ plt.show()
 ![png](output_74_0.png)
 
 
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Not surprisingly (for those with experience in stock trading) that MA7, MACD, and BB are among the important features. 
 
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;I followed the same logic for performing feature importance over the whole dataset - just the training took longer and results were a little more difficult to read, as compared with just a handful of features.
-
-## 3.8. Extracting high-level features with Stacked Autoencoders <a class="anchor" id="stacked_ae"></a>
-
-Before we proceed to the autoencoders, we'll explore an alternative activation function.
-
-### 3.8.1. Activation function - GELU (Gaussian Error) <a class="anchor" id="gelu"></a>
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**GELU** - Gaussian Error Linear Unites was recently proposed - <a href="https://arxiv.org/pdf/1606.08415.pdf">link</a>. In the paper the authors show several instances in which neural networks using GELU outperform networks using ReLU as an activation. ```gelu``` is also used in **BERT**, the NLP approach we used for news sentiment analysis.
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;We will use GELU for the autoencoders.
-
-**Note**: The cell below shows the logic behind the math of GELU. It is not the actual implementation as an activation function. I had to implement GELU inside MXNet. If you follow the code and change ```act_type='relu'``` to ```act_type='gelu'``` it will not work, unless you change the implementation of MXNet. Make a pull request on the whole project to access the MXNet implementation of GELU.
 
 
 ```python
@@ -617,7 +531,6 @@ def lrelu(x):
     return max(0.01*x, x)
 ```
 
-Let's visualize ```GELU```, ```ReLU```, and ```LeakyReLU``` (the last one is mainly used in GANs - we also use it).
 
 
 ```python
@@ -650,11 +563,6 @@ plt.show()
 ![png](output_82_0.png)
 
 
-**Note**: In future versions of this notebook I will experiment using **U-Net** (<a href="https://arxiv.org/abs/1505.04597">link</a>), and try to utilize the convolutional layer and extract (and create) even more features about the stock's underlying movement patterns. For now, we will just use a simple autoencoder made only from ```Dense``` layers.
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Ok, back to the autoencoders, depicted below (the image is only schematic, it doesn't represent the real number of layers, units, etc.)
-
-**Note**: One thing that I will explore in a later version is removing the last layer in the decoder. Normally, in autoencoders the number of encoders == number of decoders. We want, however, to extract higher level features (rather than creating the same input), so we can skip the last layer in the decoder. We achieve this creating the encoder and decoder with same number of layers during the training, but when we create the output we use the layer next to the only one as it would contain the higher level features.
 
 <center><img src="imgs/VAE.jpg" width=428></img></center>
 
@@ -753,7 +661,7 @@ print(net)
     )
 
 
-So we have 3 layers (with 400 neurons in each) in both the encoder and the decoder.
+
 
 
 ```python
@@ -823,12 +731,6 @@ print('The shape of the newly created (from the autoencoder) features is {}.'.fo
     The shape of the newly created (from the autoencoder) features is (2265, 112).
 
 
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;We created 112 more features from the autoencoder. As we want to only have high level features (overall patterns) we will create an Eigen portfolio on the newly created 112 features using Principal Component Analysis (PCA). This will reduce the dimension (number of columns) of the data. The descriptive capability of the Eigen portfolio will be the same as the original 112 features.
-
-**Note** Once again, this is purely experimental. I am not 100% sure the described logic will hold. As everything else in AI and deep learning, this is art and needs experiments.
-
-### 3.8.2. Eigen portfolio with PCA <a class="anchor" id="pca"></a>
-
 
 ```python
 # We want the PCA to create the new components to explain 80% of the variance
@@ -855,112 +757,6 @@ principalComponents.n_components_
 
     84
 
-
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;So, in order to explain 80% of the variance we need 84 (out of the 112) features. This is still a lot. So, for now we will not include the autoencoder created features. I will work on creating the autoencoder architecture in which we get the output from an intermediate layer (not the last one) and connect it to another ```Dense``` layer with, say, 30 neurons. Thus, we will 1) only extract higher level features, and 2) come up with significantly fewer number of columns.
-
-## 3.9. Deep Unsupervised Learning for anomaly detection in derivatives pricing <a class="anchor" id="dulfaddp"></a>
-
--- To be added soon.
-
-# 4. Generative Adversarial Network (GAN) <a class="anchor" id="qgan"></a>
-
-Figure 9: Simple GAN architecture
-
-<center><img src='imgs/GAN.jpg' width=960></img></center>
-
-#### How GANs work?
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;As mentioned before, the purpose of this notebook is not to explain in detail the math behind deep learning but to show its applications. Of course, thorough and very solid understanding from the fundamentals down to the smallest details, in my opinion, is extremely imperative. Hence, we will try to balance and give a high-level overview of how GANs work in order for the reader to fully understand the rationale behind using GANs in predicting stock price movements. Feel free to skip this and the next section if you are experienced with GANs (and do check  section <a href="#wgan">4.2.</a>).
-
-A GAN network consists of two models - a **Generator** ($G$) and **Discriminator** ($D$). The steps in training a GAN are:
-1. The Generator is, using random data (noise denoted $z$), trying to 'generate' data indistinguishable of, or extremely close to, the real data. It's purpose is to learn the distribution of the real data.
-2. Randomly, real or generated data is fitted into the Discriminator, which acts as a classifier and tries to understand whether the data is coming from the Generator or is the real data. $D$ estimates the (distributions) probabilities of the incoming sample to the real dataset. (_more info on comparing two distributions in <a href="#mhganwgan">section 4.2.</a> below_).
-3. Then, the losses from $G$ and $D$ are combined and propagated back through the generator. Ergo, the generator's loss depends on both the generator and the discriminator. This is the step that helps the Generator learn about the real data distribution. If the generator doesn't do a good job at generating a realistic data (having the same distribution), the Discriminator's work will be very easy to distinguish generated from real data sets. Hence, the Discriminator's loss will be very small. Small discriminator loss will result in bigger generator loss (_see the equation below for $L(D, G)$_). This makes creating the discriminator a bit tricky, because too good of a discriminator will always result in a huge generator loss, making the generator unable to learn.
-4. The process goes on until the Discriminator can no longer distinguish generated from real data.
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;When combined together, $D$ and $G$ as sort of playing a _minmax_ game (the Generator is trying to _fool_ the Discriminator making it increase the probability for on fake examples, i.e. minimize $\mathbb{E}_{z \sim p_{z}(z)} [\log (1 - D(G(z)))]$. The Discriminator wants to separate the data coming from the Generator, $D(G(z))$, by maximizing $\mathbb{E}_{x \sim p_{r}(x)} [\log D(x)]$). Having separated loss functions, however, it is not clear how both can converge together (that is why we use some advancements over the plain GANs, such as Wasserstein GAN). Overall, the combined loss function looks like:
-
-$$L(D, G) = \mathbb{E}_{x \sim p_{r}(x)} [\log D(x)] + \mathbb{E}_{z \sim p_z(z)} [\log(1 - D(G(z)))]$$
-
-**Note**: Really useful tips for training GANs can be found <a href="https://github.com/soumith/ganhacks">here</a>.
-
-**Note**: I will not include the complete code behind the **GAN** and the **Reinforcement learning** parts in this notebook - only the results from the execution (the cell outputs) will be shown. Make a pull request or contact me for the code.
-
-## 4.1. Why GAN for stock market prediction? <a class="anchor" id="whygan"></a>
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**Generative Adversarial Networks** (GAN) have been recently used mainly in creating realistic images, paintings, and video clips. There aren't many applications of GANs being used for predicting time-series data as in our case. The main idea, however, should be same - we want to predict future stock movements. In the future, the pattern and behavior of GS's stock should be more or less the same (unless it starts operating in a totally different way, or the economy drastically changes). Hence, we want to 'generate' data for the future that will have similar (not absolutely the same, of course) distribution as the one we already have - the historical trading data. So, in theory, it should work.
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;In our case, we will use **LSTM** as a time-series generator, and **CNN** as a discriminator.
-
-## 4.2. Metropolis-Hastings GAN and Wasserstein GAN <a class="anchor" id="mhganwgan"></a>
-
-**Note:** _The next couple of sections assume some experience with GANs._
-
-#### **I. Metropolis-Hastings GAN**
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;A recent improvement over the traditional GANs came out from Uber's engineering team and is called **Metropolis-Hastings GAN** (MHGAN). The idea behind Uber's approach is (as they state it) somewhat similar to another approach created by Google and University of California, Berkeley called **Discriminator Rejection Sampling** (<a href="https://arxiv.org/pdf/1810.06758.pdf">DRS</a>). Basically, when we train GAN we use the Discriminator ($D$) for the sole purpose of better training the Generator ($G$). Often, after training the GAN we do not use the $D$ any more. MHGAN and DRS, however, try to use $D$ in order to choose samples generated by $G$ that are close to the real data distribution (slight difference between is that MHGAN uses Markov Chain Monte Carlo (MCMC) for sampling).
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;MHGAN takes **_K_** samples generated from the $G$ (created from independent noise inputs to the $G$ - $z_0$ to $z_K$ in the figure below). Then it sequentially runs through the **_K_** outputs ($x'_0$ to $x'_K$) and following an acceptance rule (created from the Discriminator) decides whether to accept the current sample or keep the last accepted one. The last kept output is the one considered the real output of $G$.
-
-**Note**: MHGAN is originally implemented by Uber in pytorch. I only transferred it into MXNet/Gluon. 
-
-
-#### **Note**: I will also upload it into Github sometime soon.
-<br></br>
-Figure 10: Visual representation of MHGAN (from the original <a href="https://eng.uber.com/mh-gan/?amp">Uber post</a>).
-
-<center><img src='imgs/MHGAN.png' width=500></img></center>
-
-#### **II. Wasserstein GAN** <a class="anchor" id="wgan"></a>
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Training GANs is quite difficult. Models may never converge and mode collapse can easily happen. We will use a modification of GAN called **Wasserstein** GAN - <a href="https://arxiv.org/pdf/1701.07875.pdf">WGAN</a>.
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Again, we will not go into details, but the most notable points to make are:
-- As we know the main goal behind GANs is for the Generator to start transforming random noise into some given data that we want to mimic. Ergo, the idea of comparing the similarity between two distributions is very imperative in GANs. The two most widely used such metrics are:
-  * **KL divergence** (Kullback–Leibler) - $D_{KL}(p \| q) = \int_x p(x) \log \frac{p(x)}{q(x)} dx$. $D_{KL}$ is zero when $p(x)$ is equal to $q(x)$,
-  * **JS Divergence** (Jensen–Shannon) - $D_{JS}(p \| q) = \frac{1}{2} D_{KL}(p \| \frac{p + q}{2}) + \frac{1}{2} D_{KL}(q \| \frac{p + q}{2})$. JS divergence is bounded by 0 and 1, and, unlike KL divergence, is symmetric and smoother. Significant success in GAN training was achieved when the loss was switched from KL to JS divergence.
-- WGAN uses Wasserstein distance, $W(p_r, p_g) = \frac{1}{K} \sup_{\| f \|_L \leq K} \mathbb{E}_{x \sim p_r}[f(x)] - \mathbb{E}_{x \sim p_g}[f(x)]$ (where $sup$ stands for _supremum_), as a loss function (also called Earth Mover's distance, because it normally is interpreted as moving one pile of, say, sand to another one, both piles having different probability distributions, using minimum energy during the transformation). Compared to KL and JS divergences, Wasserstein metric gives a smooth measure (without sudden jumps in divergence). This makes it much more suitable for creating a stable learning process during the gradient descent.
-- Also, compared to KL and JS, Wasserstein distance is differentiable nearly everywhere. As we know, during backpropagation, we differentiate the loss function in order to create the gradients, which in turn update the weights. Therefore, having a differentiable loss function is quite important.
-
-#### _Hands down, this was the toughest part of this notebook. Mixing WGAN and MHGAN took me three days._
-
-## 4.4. The Generator - One layer RNN <a class="anchor" id="thegenerator"></a>
-
-### 4.4.1. LSTM or GRU <a class="anchor" id="lstmorgru"></a>
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;As mentioned before, the generator is a LSTM network a type of Recurrent Neural Network (RNN). RNNs are used for time-series data because because they keep track of all previous data points and can capture patterns developing through time. Due to their nature, RNNs many time suffer from _vanishing gradient_ - that is, the changes the weights receive during training become so small, that they don't change, making the network unable to converge to a minimal loss (The opposite problem can also be observed at times - when gradients become too big. This is called _gradient exploding_, but the solution to this is quite simple - clip gradients if they start exceeding some constant number, i.e. gradient clipping). Two modifications tackle this problem - Gated Recurrent Unit (**GRU**) and Long-Short Term Memory (**LSTM**). The biggest differences between the two are: 1) GRU has 2 gates (update and reset) and LSTM has 4 (update, input, forget, and output), 2) LSTM maintains an internal memory state, while GRU doesn’t, and 3) LSTM applies a nonlinearity (sigmoid) before the output gate, GRU doesn’t.
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;In most cases LSTM and GRU give similar results in terms of accuracy but GRU is much less computational intensive, as GRU has much fewer trainable params. LSTMs, however, and much more used. 
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Strictly speaking, the math behind the LSTM cell (the gates) is:
-
-
-$$g_t = \text{tanh}(X_t W_{xg} + h_{t-1} W_{hg} + b_g),$$
-
-
-$$i_t = \sigma(X_t W_{xi} + h_{t-1} W_{hi} + b_i),$$
-
-$$f_t = \sigma(X_t W_{xf} + h_{t-1} W_{hf} + b_f),$$
-
-$$o_t = \sigma(X_t W_{xo} + h_{t-1} W_{ho} + b_o),$$
-
-$$c_t = f_t \odot c_{t-1} + i_t \odot g_t,$$
-
-$$h_t = o_t \odot \text{tanh}(c_t),$$
-
-where $\odot$ is an element-wise multiplication operator, and,
-for all $x = [x_1, x_2, \ldots, x_k]^\top \in R^k$ the two activation functions:,
-
-$$\sigma(x) = \left[\frac{1}{1+\exp(-x_1)}, \ldots, \frac{1}{1+\exp(-x_k)}]\right]^\top,$$
-
-$$\text{tanh}(x) = \left[\frac{1-\exp(-2x_1)}{1+\exp(-2x_1)},  \ldots, \frac{1-\exp(-2x_k)}{1+\exp(-2x_k)}\right]^\top$$
-
-### 4.4.2. The LSTM architecture <a class="anchor" id="lstmarchitecture"></a>
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The LSTM architecture is very simple - one ```LSTM``` layer with 112 input units (as we have 112 features in the dataset) and 500 hidden units, and one ```Dense``` layer with 1 output - the price for every day. The initializer is Xavier and we will use L1 loss (which is mean absolute error loss with L1 regularization - see section 4.4.5. for more info on regularization).
-
-**Note** - In the code you can see we use ```Adam``` (with ```learning rate``` of .01) as an optimizer. Don't pay too much attention on that now - there is a section specially dedicated to explain what hyperparameters we use (learning rate is excluded as we have learning rate scheduler - <a href="#lrscheduler">section 4.4.3.</a>) and how we optimize these hyperparameters - <a href="#hyperparams">section 4.6.</a>
 
 
 ```python
@@ -992,7 +788,7 @@ trainer = gluon.Trainer(lstm_model.collect_params(), 'adam', {'learning_rate': .
 loss = gluon.loss.L1Loss()
 ```
 
-We will use 500 neurons in the LSTM layer and use Xavier initialization. For regularization we'll use L1. Let's see what's inside the ```LSTM``` as printed by MXNet.
+
 
 
 ```python
@@ -1005,21 +801,6 @@ print(lstm_model)
     )
 
 
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;As we can see, the input of the LSTM are the 112 features (```dataset_total_df.shape[1]```) which then go into 500 neurons in the LSTM layer, and then transformed to a single output - the stock price value.
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The logic behind the LSTM is: we take 17 (```sequence_length```) days of data (again, the data being the stock price for GS stock every day + all the other feature for that day - correlated assets, sentiment, etc.) and try to predict the 18th day.
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;In another post I will explore whether modification over the vanilla LSTM would be more beneficial, such as: 
-- using **bidirectional** LSTM layer - in theory, going backwards (from end of the data set towards the beginning) might somehow help the LSTM figure out the pattern of the stock movement.
-- using **stacked** RNN architecture - having not only one LSTM layer but 2 or more. This, however, might be dangerous, as we might end up overfitting the model, as we don't have a lot of data (we have just 1,585 day worth of data).
-- Exploring **GRU** - as already explained, GRUs' cells are much more simpler.
-- Adding **attention** vectors to the RNN.
-
-### 4.4.3. Learning rate scheduler <a class="anchor" id="lrscheduler"></a>
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;One of the most important hyperparameters is the learning rate. Setting the learning rate for almost every optimizer (such as SGD, Adam, or RMSProp) is crucially important when training neural networks because it controls both the speed of convergence and the ultimate performance of the network. One of the simplest learning rate strategies is to have a fixed learning rate throughout the training process. Choosing a small learning rate allows the optimizer find good solutions, but this comes at the expense of limiting the initial speed of convergence. Changing the learning rate over time can overcome this tradeoff.
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Recent papers, such as <a href="https://arxiv.org/pdf/1806.01593.pdf">this</a>, show the benefits of changing the global learning rate during training, in terms of both convergence and time.
 
 
 ```python
@@ -1078,45 +859,6 @@ plt.show()
 ![png](output_129_0.png)
 
 
-### 4.4.4. How to prevent overfitting and the bias-variance trade-off <a class="anchor" id="preventoverfitting"></a>
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Having a lot of features and neural networks we need to make sure we prevent overfitting and be mindful of the total loss.
-
-We use several techniques for preventing overfitting (not only in the LSTM, but also in the CNN and the auto-encoders):
-- **Ensuring data quality**. We already performed statistical checks and made sure the data doesn't suffer from multicollinearity or serial autocorrelation. Further we performed feature importance check on each feature. Finally, the initial feature selection (e.g. selecting correlated assets, technical indicators, etc.) was done with some domain knowledge about the mechanics behind the way stock markets work.
-- **Regularization** (or weights penalty). The two most widely used regularization techniques are LASSO (**L1**) and Ridge (**L2**). L1 adds the mean absolute error and L2 adds mean squared error to the loss. Without going into too many mathematical details, the basic differences are: lasso regression (L1) does both variable selection and parameter shrinkage, whereas Ridge regression only does parameter shrinkage and end up including all the coefficients in the model. In presence of correlated variables, ridge regression might be the preferred choice. Also, ridge regression works best in situations where the least square estimates have higher variance. Therefore, it depends on our model objective. The impact of the two types of regularizations is quite different. While they both penalize large weights, L1 regularization leads to a non-differentiable function at zero. L2 regularization favors smaller weights, but L1 regularization favors weights that go to zero. So, with L1 regularization you can end up with a sparse model - one with fewer parameters. In both cases the parameters of the L1 and L2 regularized models "shrink", but in the case of L1 regularization the shrinkage directly impacts the complexity (the number of parameters) of the model. Precisely, ridge regression works best in situations where the least square estimates have higher variance. L1 is more robust to outliers, is used when data is sparse, and creates feature importance. We will use L1.
-- **Dropout**. Dropout layers randomly remove nodes in the hidden layers.
-- **Dense-sparse-dense training**. - <a href="https://arxiv.org/pdf/1607.04381v1.pdf">link</a>
-- **Early stopping**.
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Another important consideration when building complex neural networks is the bias-variance trade-off. Basically, the error we get when training nets is a function of the bias, the variance, and irreducible error - σ (error due to noise and randomness). The simplest formula of  the trade-off is:
-
-$$Error = bias^{2} + variance + \sigma$$
-
-- **Bias**. Bias measures how well a trained (on training dataset) algorithm can generalize on unseen data. High bias (underfitting) meaning the model cannot work well on unseen data.
-- **Variance**. Variance measures the sensitivity of the model to changes in the dataset. High variance is the overfitting.
-
-### 4.4.5. Custom weights initializers and custom loss metric <a class="anchor" id="customfns"></a>
-
-#### Coming soon
-
-## 4.5. The Discriminator - One Dimentional CNN <a class="anchor" id="thediscriminator"></a>
-
-### 4.5.1. Why CNN as a discriminator? <a class="anchor" id="why_cnn_architecture"></a>
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;We usually use CNNs for work related to images (classification, context extraction, etc). They are very powerful at extracting features from features from features, etc. For example, in an image of a dog, the first convolutional layer will detect edges, the second will start detecting circles, and the third will detect a nose. In our case, data points form small trends, small trends form bigger, trends in turn form patterns. CNNs' ability to detect features can be used for extracting information about patterns in GS's stock price movements.
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Another reason for using CNN is that CNNs work well on spatial data - meaning data points that are closer to each other are more related to each other, than data points spread across. This should hold true for time series data. In our case each data point (for each feature) is for each consecutive day. It is natural to assume that the closer two days are to each other, the more related they are to each other. One thing to consider (although not covered in this work) is seasonality and how it might change (if at all) the work of the CNN.
-
-**Note**: As many other parts in this notebook, using CNN for time series data is experimental. We will inspect the results, without providing mathematical or other proofs. And results might vary using different data, activation functions, etc.
-
-### 4.5.1. The CNN Architecture <a class="anchor" id="the_cnn_architecture"></a>
-
-Figure 11: High level overview of the CNN architecture.
-
-<center><img src='imgs/CNN.jpg' width=960></img></center>
-
-The code for the CNN inside the GAN looks like this:
 
 
 ```python
@@ -1145,7 +887,6 @@ with net.name_scope():
 # ... other parts of the GAN
 ```
 
-Let's print the CNN.
 
 
 ```python
@@ -1168,96 +909,9 @@ print(cnn_net)
       (12): Activation(relu)
       (13): Dense(None -> 1, linear)
     )
+ <a class="anchor" id="rl_ppo"></a>
 
 
-## 4.6. Hyperparameters <a class="anchor" id="hyperparams"></a>
-
-The hyperparameters that we will track and optimize are:
-- ```batch_size``` : batch size of the LSTM and CNN
-- ```cnn_lr```: the learningrate of the CNN
-- ```strides```: the number of strides in the CNN
-- ```lrelu_alpha```: the alpha for the LeakyReLU in the GAN
-- ```batchnorm_momentum```: momentum for the batch normalisation in the CNN
-- ```padding```: the padding in the CNN
-- ```kernel_size':1```: kernel size in the CNN
-- ```dropout```: dropout in the LSTM
-- ```filters```: the initial number of filters
-
-We will train over 200 ```epochs```.
-
-# 5. Hyperparameters optimization <a class="anchor" id="hyperparams_optim"></a>
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;After the GAN trains on the 200 epochs it will record the MAE (which is the error function in the LSTM, the $G$) and pass it as a reward value to the Reinforcement learning that will decide whether to change the hyperparameters of keep training with the same set of hyperparameters. As described later, this approach is strictly for experimenting with RL.
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If the RL decides it will update the hyperparameters it will call Bayesian optimisation (discussed below) library that will give the next best expected set of the hyperparams.
-
-## 5.1. Reinforcement learning for hyperparameters optimization <a class="anchor" id="reinforcementlearning"></a>
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Why do we use reinforcement learning in the hyperparameters optimization? Stock markets change all the time. Even if we manage to train our GAN and LSTM to create extremely accurate results, the results might only be valid for a certain period. Meaning, we need to constantly optimise the whole process. To optimize the process we can:
-- Add or remove features (e.g. add new stocks or currencies that might be correlated) 
-- Improve the our deep learning models. One of the most important ways to improve the models is through the hyper parameters (listed in Section 5). Once having found a certain set of hyperparameters we need to decide when to change them and when to use the already known set (exploration vs. exploitation). Also, stocks market represents a continuous space that depends on millions parameters.
-
-**Note**: The purpose of the whole reinforcement learning part of this notebook is more research oriented. We will explore different RL approaches using the GAN as an environment. There are many ways in which we can successfully perform hyperparameter optimization on our deep learning models without using RL. But... why not.
-
-**Note**: The next several sections assume you have some knowledge about RL - especially policy methods and Q-learning.
-
-### 5.1.1. Reinforcement Learning Theory <a class="anchor" id="reinforcementlearning_theory"></a>
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Without explaining the basics of RL we will jump into the details of the specific approaches we implement here. We will use model-free RL algorithms for the obvious reason that we do not know the whole environment, hence there is no defined model for how the environment works - if there was we wouldn't need to predict stock prices movements - they will just follow the model. We will use the two subdivisions of model-free RL - Policy optimization and Q-learning.
-
-- **Q-learning** - in Q-learning we learn the **value** of taking an action from a given state. **Q-value** is the expected return after taking the action. We will use **Rainbow** which is a combination of seven Q learning algorithms.
-- **Policy Optimization** - in policy optimization we learn the action to take from a given state. (if we use methods like Actor/Critic) we also learn the value of being in a given state. We will use **Proximal Policy Optimization**.
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;One crucial aspect of building a RL algorithm is accurately setting the reward. It has to capture all aspects of the environment and the agent's interaction with the environment. We define the reward, **_R_**, as:
-
-$$Reward = 2*loss_G + loss_D + accuracy_G,$$
-
-where $loss_G$, $accuracy_G$, and $loss_D$ are the Generator's loss and accuracy, and Discriminator's loss, respectively. The environment is the GAN and the results of the LSTM training. The action the different agents can take is how to change the hyperparameters of the GAN's $D$ and $G$ nets.
-
-#### 5.1.1.1. Rainbow <a class="anchor" id="rl_rainbow"></a>
-
-**What is Rainbow?** 
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Rainbow (<a href="https://arxiv.org/pdf/1710.02298.pdf">link</a>) is a Q learning based off-policy deep reinforcement learning algorithm combining seven algorithm together:
-* **DQN**. DQN is an extension of Q learning algorithm that uses a neural network to represent the Q value. Similar to supervised (deep) learning, in DQN we train a neural network and try to minimize a loss function. We train the network by randomly sampling transitions (state, action, reward). The layers can be not only fully connected ones, but also convolutional, for example.
-* **Double Q Learning**. Double QL handles a big problem in Q learning, namely the overestimation bias.
-* **Prioritized replay**. In the vanilla DQN, all transitions are stored in a replay buffer and it uniformly samples this buffer. However, not all transitions are equally beneficial during the learning phase (which also makes learning inefficient as more episodes are required). Prioritized experience replay doesn't sample uniformly, rather it uses a distribution that gives higher probability to samples that have had higher Q loss in previous iterations.
-* **Dueling networks.** Dueling networks change the Q learning architecture a little by using two separate streams (i.e. having two different mini-neural networks). One stream is for the value and one for the _advantage_. Both of them share a convolutional encoder. The tricky part is the merging of the streams - it uses a special aggregator (_Wang et al. 2016_).
-  - _Advantage_, formula is $A(s, a) = Q(s, a) - V(s)$, generally speaking is a comparison of how good an action is compared to the average action for a specific state. Advantages are sometimes used when a 'wrong' action cannot be penalized with negative reward. So _advantage_ will try to further reward good actions from the average actions.
-* **Multi-step learning.** The big difference behind Multi-step learning is that it calculates the Q-values using N-step returns (not only the return from the next step), which naturally should be more accurate.
-* **Distributional RL**. Q learning uses average estimated Q-value as target value. However, in many cases the Q-values might not be the same in different situations. Distributional RL can directly learn (or approximate) the distribution of Q-values rather than averaging them. Again, the math is much more complicated than that, but for us the benefit is more accurate sampling of the Q-values.
-* **Noisy Nets**. Basic DQN implements a simple 𝜀-greedy mechanism to do exploration. This approach to exploration inefficient at times. The way Noisy Nets approach this issue is by adding a noisy linear layer. Over time, the network will learn how to ignore the noise (added as a noisy stream). But this learning comes at different rates in different parts of the space, allowing for state exploration.
-<br></br>
-#### **Note**: Stay tuned - I will upload a MXNet/Gluon implementation on Rainbow to Github in early February 2019.
-<br></br>
-
-
-
-#### 5.1.1.2. PPO <a class="anchor" id="rl_ppo"></a>
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**Proximal Policy Optimization** (<a href="https://arxiv.org/pdf/1707.06347.pdf">PPO</a>) is a policy optimization model-free type of reinforcement learning. It is much simpler to implement that other algorithms and gives very good results.
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Why do we use PPO? One of the advantages of PPO is that it directly learns the policy, rather than indirectly via the values (the way Q Learning uses Q-values to learn the policy). It can work well in continuous action spaces, which is suitable in our use case and can learn (through mean and standard deviation) the distribution probabilities (if softmax is added as an output).
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The problem of policy gradient methods is that they are extremely sensitive to the step size choice - if it is small the progress takes too long (most probably mainly due to the need of a second-order derivatives matrix); if it is large, there is a lot noise which significantly reduces the performance. Input data is nonstationary due to the changes in the policy (also the distributions of the reward and observations change). As compared to supervised learning, poorly chosen step can be much more devastating as it affects the whole distribution of next visits. PPO can solve these issues. What is more, compared to some other approaches, PPO: 
-* is much less complicated, for example compared to **ACER**, which requires additional code for keeping the off-policy correlations and also a replay buffer, or **TRPO** which has a constraint imposed on the surrogate objective function (the KL divergence between the old and the new policy). This constraint is used to control the policy of changing too much - which might create instability. PPO reduces the computation (created by the constraint) by utilizing a _clipped  (between [1- 𝜖, 1+𝜖]) surrogate objective function_ and modifying the objective function with a penalty for having too big of an update.
-* gives compatibility with algos that share parameters between value and policy function or auxiliary losses, as compared to TRPO (although PPO also have the gain of trust region PO).
-
-**Note**: For the purpose of our exercise we won't go too much into the research and optimization of RL approaches, PPO and the others included. Rather, we will take what is available and try to fit into our process for hyperparameter optimization for our GAN, LSTM, and CNN models. The code we will reuse and customize is created by OpenAI and is available <a href="https://github.com/openai/baselines">here</a>.
-
-### 5.1.2. Further work on Reinforcement learning <a class="anchor" id="reinforcementlearning_further"></a>
-
-Some ideas for further exploring reinforcement learning:
-- One of the first things I will introduce next is using **Augmented Random Search** (<a href="https://arxiv.org/pdf/1803.07055.pdf">link</a>) as an alternative algorithm. The authors of the algorithm (out of UC, Berkeley) have managed to achieve similar rewards results as other state of the art approaches, such as PPO, but on average 15 times faster.
-- Choosing a reward function is very important. I stated the currently used reward function above, but I will try to play with different functions as an alternative.
-- Using **Curiosity** as an exploration policy.
-- Create **multi-agent** architecture as proposed by Berkeley's AI Research team (BAIR) - <a href="https://bair.berkeley.edu/blog/2018/12/12/rllib/">link</a>.
-
-## 5.2. Bayesian optimization <a class="anchor" id="bayesian_opt"></a>
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Instead of the grid search, that can take a lot of time to find the best combination of hyperparameters, we will use **Bayesian optimization**. The library that we'll use is already implemented - <a href="https://github.com/fmfn/BayesianOptimization">link</a>.
-
-The next part of the code only shows the initialization.
 
 
 ```python
@@ -1268,20 +922,17 @@ from bayes_opt import UtilityFunction
 utility = UtilityFunction(kind="ucb", kappa=2.5, xi=0.0)
 ```
 
-### 5.2.1. Gaussian process <a class="anchor" id="gaussprocess"></a>
+ <a class="anchor" id="gaussprocess"></a>
 
 <center><img src="imgs/Bayes.png" width=600></img></center>
 
-# 6. The result <a class="anchor" id="theresult"></a>
+ <a class="anchor" id="theresult"></a>
 
 
 ```python
 from utils import plot_prediction
 ```
 
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Finally we will compare the output of the LSTM when the unseen (test) data is used as an input after different phases of the process.
-
-1. Plot after the first epoch.
 
 
 ```python
@@ -1292,7 +943,7 @@ plot_prediction('Predicted and Real price - after first epoch.')
 ![png](output_168_0.png)
 
 
-2. Plot after 50 epochs.
+
 
 
 ```python
@@ -1312,7 +963,6 @@ plot_prediction('Predicted and Real price - after first 200 epochs.')
 ![png](output_171_0.png)
 
 
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The RL run for ten episodes (we define an eposide to be one full GAN training on the 200 epochs.)
 
 
 ```python
@@ -1323,25 +973,4 @@ plot_prediction('Final result.')
 ![png](output_173_0.png)
 
 
-#### As a next step, I will try to take everything separately and provide some analysis on what worked and why. Why did we receive these results and is it just by coinscidence? So stay tuned.
 
-# What is next? <a class="anchor" id="whatisnext"></a>
-
-- Next, I will try to create a RL environment for testing trading algorithms that decide when and how to trade. The output from the GAN will be one of the parameters in the environment.
-
-# About me <a class="anchor" id="me"></a>
-
-www.linkedin.com/in/borisbanushev
-
-# Disclaimer <a class="anchor" id="disclaimer"></a>
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**This notebook is entirely informative. None of the content presented in this notebook constitutes a recommendation that any particular security, portfolio of securities, transaction or investment strategy is suitable for any specific person. Futures, stocks and options trading involves substantial risk of loss and is not suitable for every investor. The valuation of futures, stocks and options may fluctuate, and, as a result, clients may lose more than their original investment.**
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**All trading strategies are used at your own risk.**
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;There are many many more details to explore - in choosing data features, in choosing algorithms, in tuning the algos, etc. This version of the notebook itself took me 2 weeks to finish. I am sure there are many unaswered parts of the process. So, any comments and suggestion - please do share. I'd be happy to add and test any ideas in the current process.
-
-Thanks for reading.
-
-Best,
-Boris
