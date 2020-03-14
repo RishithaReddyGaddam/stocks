@@ -305,8 +305,6 @@ plt.show()
 ```
 
 
-![png](output_45_0.png)
-
 
 
 
