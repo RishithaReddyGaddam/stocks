@@ -118,7 +118,7 @@ dataset_TI_df.head()
     .dataframe thead th {
         text-align: right;
     }
-</style>
+
 <table border="1" class="dataframe">
   <thead>
     <tr style="text-align: right;">
