@@ -920,11 +920,7 @@ from bayes_opt import UtilityFunction
 utility = UtilityFunction(kind="ucb", kappa=2.5, xi=0.0)
 ```
 
- <a class="anchor" id="gaussprocess"></a>
 
-<center><img src="imgs/Bayes.png" width=600></img></center>
-
- <a class="anchor" id="theresult"></a>
 
 
 ```python
